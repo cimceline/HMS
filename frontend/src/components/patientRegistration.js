@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 
 function PatientRegistration() {
   const [patients, setPatients] = useState([]);
@@ -9,60 +10,131 @@ function PatientRegistration() {
     ward: "",
     diagnosis: ""
   });
-  const [editIndex, setEditIndex] = useState(null);
+  const [editId, setEditId] = useState(null);
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  // Use proxy in package.json, so just /api/patients
+  const API = "/api/patients";
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (editIndex !== null) {
-      const updated = patients.map((p, i) => (i === editIndex ? form : p));
-      setPatients(updated);
-      setEditIndex(null);
-    } else {
-      setPatients([...patients, form]);
+  // Fetch all patients from backend
+  const fetchPatients = async () => {
+    try {
+      const res = await axios.get(API);
+      setPatients(res.data);
+    } catch (err) {
+      console.log(err);
     }
-    setForm({ name: "", age: "", gender: "", ward: "", diagnosis: "" });
   };
 
-  const handleEdit = (i) => {
-    setForm(patients[i]);
-    setEditIndex(i);
+  useEffect(() => {
+    fetchPatients();
+  }, []);
+
+  // Handle form input change
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleDelete = (i) => setPatients(patients.filter((_, idx) => idx !== i));
+  // Handle form submit (create or update)
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      if (editId !== null) {
+        // UPDATE
+        await axios.put(`${API}/${editId}`, form);
+      } else {
+        // CREATE
+        await axios.post(API, form);
+      }
+
+      // Refresh patient list
+      fetchPatients();
+
+      // Reset form
+      setForm({
+        name: "",
+        age: "",
+        gender: "",
+        ward: "",
+        diagnosis: ""
+      });
+      setEditId(null);
+
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  // Fill form for editing
+  const handleEdit = (p) => {
+    setForm(p);
+    setEditId(p.id); // Use DB id, not index
+  };
+
+  // Delete patient
+  const handleDelete = async (id) => {
+    try {
+      await axios.delete(`${API}/${id}`);
+      fetchPatients();
+    } catch (err) {
+      console.log(err);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <h2 className="text-2xl font-bold mb-4 text-center">Patient Registration</h2>
+    <div style={{ padding: "20px" }}>
+      <h1>Patient Registration</h1>
 
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-6 rounded shadow-md max-w-md mx-auto mb-6"
-      >
-        <input className="w-full p-2 mb-3 border rounded" name="name" placeholder="Name" value={form.name} onChange={handleChange} />
-        <input className="w-full p-2 mb-3 border rounded" type="number" name="age" placeholder="Age" value={form.age} onChange={handleChange} />
-        <select className="w-full p-2 mb-3 border rounded" name="gender" value={form.gender} onChange={handleChange}>
-          <option value="">Gender</option>
+      {/* Form */}
+      <form onSubmit={handleSubmit}>
+        <input
+          name="name"
+          value={form.name}
+          onChange={handleChange}
+          placeholder="Name"
+        />
+        <br />
+        <input
+          name="age"
+          value={form.age}
+          onChange={handleChange}
+          placeholder="Age"
+        />
+        <br />
+        <select
+          name="gender"
+          value={form.gender}
+          onChange={handleChange}
+        >
+          <option value="">Select Gender</option>
           <option value="male">Male</option>
           <option value="female">Female</option>
         </select>
-        <input className="w-full p-2 mb-3 border rounded" name="ward" placeholder="Ward" value={form.ward} onChange={handleChange} />
-        <input className="w-full p-2 mb-3 border rounded" name="diagnosis" placeholder="Diagnosis" value={form.diagnosis} onChange={handleChange} />
-
-        <button className="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600">
-          {editIndex !== null ? "Update" : "Add"}
-        </button>
+        <br />
+        <input
+          name="ward"
+          value={form.ward}
+          onChange={handleChange}
+          placeholder="Ward"
+        />
+        <br />
+        <input
+          name="diagnosis"
+          value={form.diagnosis}
+          onChange={handleChange}
+          placeholder="Diagnosis"
+        />
+        <br />
+        <button type="submit">{editId ? "Update" : "Register"}</button>
       </form>
 
-      <ul className="max-w-md mx-auto space-y-2">
-        {patients.map((p, i) => (
-          <li key={i} className="bg-white p-3 rounded shadow flex justify-between items-center">
-            <span>{p.name} | {p.age} | {p.gender} | {p.ward} | {p.diagnosis}</span>
-            <div className="space-x-2">
-              <button className="bg-yellow-400 px-2 py-1 rounded" onClick={() => handleEdit(i)}>Edit</button>
-              <button className="bg-red-500 text-white px-2 py-1 rounded" onClick={() => handleDelete(i)}>Delete</button>
-            </div>
+      {/* Patient List */}
+      <ul>
+        {patients.map((p) => (
+          <li key={p.id}>
+            {p.name} | {p.age} | {p.gender} | {p.ward} | {p.diagnosis} {" "}
+            <button onClick={() => handleEdit(p)}>Edit</button>
+            <button onClick={() => handleDelete(p.id)}>Delete</button>
           </li>
         ))}
       </ul>
